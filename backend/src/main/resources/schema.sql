@@ -272,6 +272,33 @@ CREATE TABLE IF NOT EXISTS snapshot_cash (
 )
 ^
 
+-- ============================================================
+-- 迟到事件影响预览：发布后到达的事件可能波及哪些已发布快照。
+-- 只追加、只标记待复核；不撤销快照、不改写历史投影、不伪造金额差值。
+-- 幂等：同一事件对同一快照的同一原因（含关联事件）只登记一次，
+-- 重复导入被幂等拦截时不会重复产生影响项。
+-- ============================================================
+CREATE TABLE IF NOT EXISTS late_event_impact (
+    id              BIGSERIAL PRIMARY KEY,
+    event_id        BIGINT NOT NULL REFERENCES business_event(id),
+    account_id      VARCHAR(64) NOT NULL,
+    instrument      VARCHAR(32) NOT NULL,
+    effective_date  DATE NOT NULL,
+    snapshot_date   DATE NOT NULL,
+    snapshot_watermark_event_id BIGINT NOT NULL,
+    reason_code     VARCHAR(48) NOT NULL,
+    related_event_id BIGINT NOT NULL DEFAULT 0,
+    reason_detail   TEXT NOT NULL,
+    status          VARCHAR(16) NOT NULL DEFAULT 'PENDING_REVIEW'
+                        CHECK (status IN ('PENDING_REVIEW','REVIEWED')),
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT uq_late_impact UNIQUE (event_id, snapshot_date, reason_code, related_event_id)
+)
+^
+CREATE INDEX IF NOT EXISTS idx_late_impact_account
+    ON late_event_impact (account_id, snapshot_date)
+^
+
 -- 账实核对：外部对账单（托管行，非真实券商连接；仅核对，绝不反写历史）
 CREATE TABLE IF NOT EXISTS external_statement (
     id              BIGSERIAL PRIMARY KEY,

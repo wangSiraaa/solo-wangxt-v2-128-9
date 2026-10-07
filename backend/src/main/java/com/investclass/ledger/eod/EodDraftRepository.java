@@ -82,6 +82,24 @@ public class EodDraftRepository {
         return ids.isEmpty() ? null : ids.get(0);
     }
 
+    /** 一个已正式发布（冻结水位）的日终快照。 */
+    public record PublishedSnapshot(LocalDate businessDate, long watermarkEventId,
+                                    java.time.Instant publishedAt) {
+    }
+
+    /** 该账户全部已发布快照（按业务日升序），迟到事件影响预览据此比对。 */
+    public List<PublishedSnapshot> publishedSnapshots(String accountId) {
+        return jdbc.query("""
+                        SELECT business_date, watermark_event_id, published_at
+                        FROM eod_published_watermark
+                        WHERE account_id = :a
+                        ORDER BY business_date
+                        """,
+                new MapSqlParameterSource("a", accountId),
+                (rs, n) -> new PublishedSnapshot(rs.getObject(1, LocalDate.class),
+                        rs.getLong(2), rs.getTimestamp(3).toInstant()));
+    }
+
     public Draft find(String accountId, LocalDate date) {
         return jdbc.query("""
                         SELECT id, account_id, business_date, watermark_event_id,

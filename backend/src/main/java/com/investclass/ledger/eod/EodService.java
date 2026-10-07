@@ -2,6 +2,7 @@ package com.investclass.ledger.eod;
 
 import com.investclass.ledger.core.AccountingProperties;
 import com.investclass.ledger.core.Event;
+import com.investclass.ledger.impact.LateEventImpactService;
 import com.investclass.ledger.ledger.EventAdmissionRepository;
 import com.investclass.ledger.ledger.EventRepository;
 import com.investclass.ledger.projection.FoldEngine;
@@ -30,17 +31,20 @@ public class EodService {
     private final ProjectionService projection;
     private final EodDraftRepository drafts;
     private final ExternalStatementRepository external;
+    private final LateEventImpactService lateImpacts;
     private final AccountingProperties props;
 
     public EodService(EventRepository events, EventAdmissionRepository admissions,
                       ProjectionService projection,
                       EodDraftRepository drafts, ExternalStatementRepository external,
+                      LateEventImpactService lateImpacts,
                       AccountingProperties props) {
         this.events = events;
         this.admissions = admissions;
         this.projection = projection;
         this.drafts = drafts;
         this.external = external;
+        this.lateImpacts = lateImpacts;
         this.props = props;
     }
 
@@ -152,6 +156,12 @@ public class EodService {
         drafts.markResult(draft.id(), true, true, true, null, null, "PUBLISHED");
         drafts.publish(draft.id());
         drafts.recordPublishedWatermark(accountId, date, frozenWatermark);
+
+        // 发布期间迟到的成交：对本次及历史已发布快照登记影响预览。
+        // 只标记待复核——不撤销刚写好的快照，也不改写历史投影。
+        for (Event e : arrivalsDuringPublish) {
+            lateImpacts.evaluate(e);
+        }
 
         if (!arrivalsDuringPublish.isEmpty()) {
             long headNow = events.maxEventId(accountId);

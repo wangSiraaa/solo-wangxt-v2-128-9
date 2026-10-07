@@ -90,9 +90,10 @@ public class ImportBatchConfig {
     @Bean
     @org.springframework.batch.core.configuration.annotation.StepScope
     public ItemWriter<Registration> eventWriter(EventRepository eventRepository,
+                                                com.investclass.ledger.impact.LateEventImpactService lateImpacts,
                                                 org.springframework.jdbc.core.JdbcTemplate jdbc,
                                                 @Value("#{jobParameters['batchId']}") long batchId) {
-        return new CountingEventWriter(eventRepository, jdbc, batchId);
+        return new CountingEventWriter(eventRepository, lateImpacts, jdbc, batchId);
     }
 
     @Bean

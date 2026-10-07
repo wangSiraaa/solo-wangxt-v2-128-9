@@ -2,7 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import {
-  BusinessEvent, CashEntry, Checkpoint, Cursor, Entitlement, Lot,
+  BusinessEvent, CashEntry, Checkpoint, Cursor, Entitlement, LateImpactBoard, Lot,
   ReconciliationReport
 } from './models';
 
@@ -35,6 +35,11 @@ export class LedgerApi {
 
   cursor(account: string): Observable<Cursor> {
     return this.http.get<Cursor>(`${this.base}/accounts/${account}/cursor`);
+  }
+
+  /** 迟到事件影响预览：已发布水位 + 待复核影响项（只读，不改写历史）。 */
+  lateImpacts(account: string): Observable<LateImpactBoard> {
+    return this.http.get<LateImpactBoard>(`${this.base}/accounts/${account}/late-impacts`);
   }
 
   replay(account: string, fullRebuild = false): Observable<unknown> {

@@ -57,6 +57,11 @@
     <button [class.active]="tab()==='lots'" (click)="setTab('lots')">成本批次与来源</button>
     <button [class.active]="tab()==='cash'" (click)="setTab('cash')">现金权益</button>
     <button [class.active]="tab()==='eod'" (click)="setTab('eod')">日终复核与发布</button>
+    <button [class.active]="tab()==='impact'" (click)="setTab('impact')">
+      迟到影响预览
+      <span *ngIf="pendingImpactCount" class="badge pending" style="margin-left:6px">
+        {{ pendingImpactCount }} 待复核</span>
+    </button>
   </div>
 
   @switch (tab()) {
@@ -128,6 +133,9 @@
       <app-reconciliation
         [report]="report" [published]="published" (publish)="doPublish()">
       </app-reconciliation>
+    }
+    @case ('impact') {
+      <app-late-impacts [board]="impactBoard"></app-late-impacts>
     }
   }
 </div>

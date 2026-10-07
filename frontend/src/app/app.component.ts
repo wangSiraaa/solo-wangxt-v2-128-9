@@ -3,22 +3,23 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { LedgerApi } from './ledger-api.service';
 import {
-  BusinessEvent, CashEntry, Checkpoint, Cursor, Entitlement, Lot,
+  BusinessEvent, CashEntry, Checkpoint, Cursor, Entitlement, LateImpactBoard, Lot,
   ReconciliationReport
 } from './models';
 import { TimelineComponent } from './timeline.component';
 import { LotsComponent } from './lots.component';
 import { CashEntitlementsComponent } from './cash-entitlements.component';
 import { ReconciliationComponent } from './reconciliation.component';
+import { LateImpactsComponent } from './late-impacts.component';
 
-type Tab = 'timeline' | 'lots' | 'cash' | 'eod';
+type Tab = 'timeline' | 'lots' | 'cash' | 'eod' | 'impact';
 
 @Component({
   selector: 'app-root',
   standalone: true,
   imports: [
     CommonModule, FormsModule, TimelineComponent, LotsComponent,
-    CashEntitlementsComponent, ReconciliationComponent
+    CashEntitlementsComponent, ReconciliationComponent, LateImpactsComponent
   ],
   templateUrl: './app.component.html'
 })
@@ -38,6 +39,7 @@ export class AppComponent implements OnInit {
   entitlements: Entitlement[] = [];
   checkpoints: Checkpoint[] = [];
   cursor: Cursor | null = null;
+  impactBoard: LateImpactBoard | null = null;
   cashBalance = '0.00';
   report: ReconciliationReport | null = null;
   published = false;
@@ -93,6 +95,18 @@ export class AppComponent implements OnInit {
     this.api.cursor(this.account).subscribe({
       next: (v) => (this.cursor = v.lastEventId ? v : null), error: () => (this.cursor = null)
     });
+    this.loadImpacts();
+  }
+
+  loadImpacts(): void {
+    this.api.lateImpacts(this.account).subscribe({
+      next: (v) => (this.impactBoard = v),
+      error: () => (this.impactBoard = null)
+    });
+  }
+
+  get pendingImpactCount(): number {
+    return this.impactBoard ? this.impactBoard.impacts.length : 0;
   }
 
   doImport(): void {
@@ -141,7 +155,12 @@ export class AppComponent implements OnInit {
 
   doPublish(): void {
     this.api.publish(this.account, this.eodDate).subscribe({
-      next: (r) => { this.report = r; this.published = true; this.message = '正式视图已发布。'; },
+      next: (r) => {
+        this.report = r;
+        this.published = true;
+        this.message = '正式视图已发布。';
+        this.loadImpacts();
+      },
       error: (e) => {
         this.published = false;
         this.fail(e);

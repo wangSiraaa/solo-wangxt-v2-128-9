@@ -160,6 +160,17 @@ public class EventRepository {
                 rowMapper());
     }
 
+    /** 同账户同证券的全部事件（迟到影响预览据此关联公司行动/在途成交）。 */
+    public List<Event> findByAccountAndInstrument(String accountId, String instrument) {
+        return jdbc.query("""
+                SELECT * FROM business_event
+                WHERE account_id = :a AND instrument = :i
+                ORDER BY id
+                """,
+                new MapSqlParameterSource("a", accountId).addValue("i", instrument),
+                rowMapper());
+    }
+
     /** 下一草稿窗口：业务日 <= nextDate，且排除被标记为迟到、归属日 > nextDate 的事件。
      *  迟到当日事件在“下一草稿”中纳入（admitted_to_date = date+1）。 */
     public List<Event> findByAccountForDateExcludingLaterAdmissions(
