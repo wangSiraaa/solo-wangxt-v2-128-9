@@ -3,7 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import {
   BusinessEvent, CashEntry, Checkpoint, Cursor, Entitlement, Lot,
-  ReconciliationReport
+  LateImpactPreview, ReconciliationReport
 } from './models';
 
 @Injectable({ providedIn: 'root' })
@@ -65,5 +65,17 @@ export class LedgerApi {
 
   uploadStatement(body: Record<string, unknown>): Observable<string> {
     return this.http.post(`${this.base}/statements`, body, { responseType: 'text' });
+  }
+
+  /** 扫描迟到事件影响（幂等；不撤销快照、不改写历史投影）。 */
+  scanLateImpact(account: string): Observable<LateImpactPreview> {
+    return this.http.post<LateImpactPreview>(
+      `${this.base}/accounts/${account}/late-impact/scan`, null);
+  }
+
+  /** 读取已登记的迟到事件影响预览（只读）。 */
+  lateImpact(account: string): Observable<LateImpactPreview> {
+    return this.http.get<LateImpactPreview>(
+      `${this.base}/accounts/${account}/late-impact`);
   }
 }

@@ -82,6 +82,22 @@ public class EodDraftRepository {
         return ids.isEmpty() ? null : ids.get(0);
     }
 
+    /** 账户全部已发布快照（业务日升序）：迟到事件影响预览据此枚举受影响范围。 */
+    public List<PublishedWatermark> listPublishedWatermarks(String accountId) {
+        return jdbc.query("""
+                        SELECT business_date, watermark_event_id
+                        FROM eod_published_watermark
+                        WHERE account_id = :a
+                        ORDER BY business_date
+                        """,
+                new MapSqlParameterSource("a", accountId),
+                (rs, n) -> new PublishedWatermark(
+                        rs.getObject(1, LocalDate.class), rs.getLong(2)));
+    }
+
+    public record PublishedWatermark(LocalDate businessDate, long watermarkEventId) {
+    }
+
     public Draft find(String accountId, LocalDate date) {
         return jdbc.query("""
                         SELECT id, account_id, business_date, watermark_event_id,

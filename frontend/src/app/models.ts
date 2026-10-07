@@ -106,3 +106,36 @@ export interface ReconciliationReport {
   projectedCash: string;
   externalCash: string | null;
 }
+
+/** 已发布快照及其迟到事件影响计数（时间线上的“事件水位”）。 */
+export interface LateSnapshotImpact {
+  businessDate: string;
+  watermarkEventId: number;
+  impactCount: number;
+  pendingCount: number;
+}
+
+/** 单条迟到事件对某张已发布快照的可能影响（一律待复核，不含差值金额）。 */
+export interface LateImpact {
+  id: number;
+  accountId: string;
+  eventId: number;
+  snapshotDate: string;
+  reasonCode: string;
+  relatedDate: string | null;
+  instrument: string;
+  detail: string;
+  status: 'PENDING_REVIEW' | 'RESOLVED' | 'DISMISSED';
+  detectedAt: string;
+}
+
+/** 迟到事件影响预览：事件水位 + 迟到事件 + 受影响范围。 */
+export interface LateImpactPreview {
+  accountId: string;
+  snapshots: LateSnapshotImpact[];
+  lateEvents: BusinessEvent[];
+  impacts: LateImpact[];
+  newImpactCount: number;
+  totalImpactCount: number;
+  pendingCount: number;
+}

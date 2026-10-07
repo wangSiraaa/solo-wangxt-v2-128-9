@@ -286,3 +286,29 @@ CREATE TABLE IF NOT EXISTS external_statement (
     CONSTRAINT uq_external_stmt UNIQUE (account_id, business_date, instrument)
 )
 ^
+
+-- ============================================================
+-- 迟到事件影响预览（仅提示复核，绝不撤销快照/改写历史投影）
+--   正式快照发布后又导入更早业务日的事件时，按其交易日/结算日及相关
+--   除权/登记/支付/到账日，列出可能需要重新复核的已发布快照与原因。
+--   所有影响一律 PENDING_REVIEW（待复核），不存差值、不估算金额。
+--   按 (迟到事件, 快照日, 原因, 相关日) 幂等：重复导入/重复扫描不重复产生影响项。
+-- ============================================================
+CREATE TABLE IF NOT EXISTS late_event_impact (
+    id              BIGSERIAL PRIMARY KEY,
+    account_id      VARCHAR(64) NOT NULL,
+    event_id        BIGINT NOT NULL REFERENCES business_event(id),
+    snapshot_date   DATE NOT NULL,
+    reason_code     VARCHAR(48) NOT NULL,
+    related_date    DATE,
+    instrument      VARCHAR(32) NOT NULL,
+    detail          TEXT NOT NULL,
+    status          VARCHAR(24) NOT NULL DEFAULT 'PENDING_REVIEW'
+                        CHECK (status IN ('PENDING_REVIEW','RESOLVED','DISMISSED')),
+    detected_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT uq_late_impact UNIQUE (event_id, snapshot_date, reason_code, related_date)
+)
+^
+CREATE INDEX IF NOT EXISTS idx_late_impact_account
+    ON late_event_impact (account_id, snapshot_date)
+^

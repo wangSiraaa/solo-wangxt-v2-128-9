@@ -26,15 +26,18 @@ public class LedgerController {
     private final ProjectionService projection;
     private final EodService eod;
     private final com.investclass.ledger.eod.SnapshotRepository snapshots;
+    private final com.investclass.ledger.eod.LateImpactPreviewService lateImpact;
 
     public LedgerController(EventRepository events, ProjectionReadRepository read,
                             ProjectionService projection, EodService eod,
-                            com.investclass.ledger.eod.SnapshotRepository snapshots) {
+                            com.investclass.ledger.eod.SnapshotRepository snapshots,
+                            com.investclass.ledger.eod.LateImpactPreviewService lateImpact) {
         this.events = events;
         this.read = read;
         this.projection = projection;
         this.eod = eod;
         this.snapshots = snapshots;
+        this.lateImpact = lateImpact;
     }
 
     /** 事件时间轴（不可变事实流）。 */
@@ -115,5 +118,22 @@ public class LedgerController {
     public ReconciliationReport publish(@PathVariable String accountId,
                                         @PathVariable String date) {
         return eod.publish(accountId, LocalDate.parse(date));
+    }
+
+    /**
+     * 迟到事件影响预览：正式快照发布后又导入更早业务日的事件，
+     * 扫描可能需要重新复核的已发布快照与原因（幂等；不撤销快照、不改写历史投影）。
+     */
+    @PostMapping("/api/accounts/{accountId}/late-impact/scan")
+    public com.investclass.ledger.eod.LateImpactPreviewService.Preview scanLateImpact(
+            @PathVariable String accountId) {
+        return lateImpact.scan(accountId);
+    }
+
+    /** 读取已登记的迟到事件影响预览（只读，不重新计算）。 */
+    @GetMapping("/api/accounts/{accountId}/late-impact")
+    public com.investclass.ledger.eod.LateImpactPreviewService.Preview lateImpact(
+            @PathVariable String accountId) {
+        return lateImpact.get(accountId);
     }
 }

@@ -4,21 +4,22 @@ import { FormsModule } from '@angular/forms';
 import { LedgerApi } from './ledger-api.service';
 import {
   BusinessEvent, CashEntry, Checkpoint, Cursor, Entitlement, Lot,
-  ReconciliationReport
+  LateImpactPreview, ReconciliationReport
 } from './models';
 import { TimelineComponent } from './timeline.component';
 import { LotsComponent } from './lots.component';
 import { CashEntitlementsComponent } from './cash-entitlements.component';
 import { ReconciliationComponent } from './reconciliation.component';
+import { LateImpactComponent } from './late-impact.component';
 
-type Tab = 'timeline' | 'lots' | 'cash' | 'eod';
+type Tab = 'timeline' | 'lots' | 'cash' | 'eod' | 'late';
 
 @Component({
   selector: 'app-root',
   standalone: true,
   imports: [
     CommonModule, FormsModule, TimelineComponent, LotsComponent,
-    CashEntitlementsComponent, ReconciliationComponent
+    CashEntitlementsComponent, ReconciliationComponent, LateImpactComponent
   ],
   templateUrl: './app.component.html'
 })
@@ -41,6 +42,8 @@ export class AppComponent implements OnInit {
   cashBalance = '0.00';
   report: ReconciliationReport | null = null;
   published = false;
+  latePreview: LateImpactPreview | null = null;
+  scanning = false;
   message = '';
   error = '';
   loading = false;
@@ -69,6 +72,30 @@ export class AppComponent implements OnInit {
   refreshAll(): void {
     this.loadTimeline();
     this.loadDerived();
+    this.loadLateImpact();
+  }
+
+  loadLateImpact(): void {
+    this.api.lateImpact(this.account).subscribe({
+      next: (v) => (this.latePreview = v),
+      error: () => { /* 无预览数据时静默 */ }
+    });
+  }
+
+  scanLateImpact(): void {
+    this.scanning = true;
+    this.api.scanLateImpact(this.account).subscribe({
+      next: (v) => {
+        this.latePreview = v;
+        this.scanning = false;
+        if (v.newImpactCount > 0) {
+          this.message = `发现 ${v.newImpactCount} 项新的可能影响（共 ${v.totalImpactCount} 项待复核），旧快照未被改动。`;
+        } else {
+          this.message = '已扫描：没有新的迟到事件影响项。';
+        }
+      },
+      error: (e) => { this.fail(e); this.scanning = false; }
+    });
   }
 
   loadTimeline(): void {
@@ -106,6 +133,10 @@ export class AppComponent implements OnInit {
         this.message = `导入批次 ${r.batchId} 状态 ${r.status}`;
         this.loading = false;
         this.refreshAll();
+        // 导入后自动扫描：若正式快照已发布，提示迟到事件影响（幂等、不改写历史）
+        if (r.status !== 'DUPLICATE') {
+          this.scanLateImpact();
+        }
       },
       error: (e) => { this.fail(e); this.loading = false; }
     });
@@ -141,7 +172,11 @@ export class AppComponent implements OnInit {
 
   doPublish(): void {
     this.api.publish(this.account, this.eodDate).subscribe({
-      next: (r) => { this.report = r; this.published = true; this.message = '正式视图已发布。'; },
+      next: (r) => {
+        this.report = r; this.published = true; this.message = '正式视图已发布。';
+        // 发布冻结水位后，扫描是否有发布后到达的事件需要复核提示
+        this.scanLateImpact();
+      },
       error: (e) => {
         this.published = false;
         this.fail(e);
